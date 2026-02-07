@@ -1,4 +1,10 @@
+//App Description
 
+//The system scans a QR code and extracts its ID.
+//The ID is then validated against the database.
+//If a matching record is found, the associated data is retrieved and displayed.
+//If the ID is invalid or does not match any record, a compatibility error is shown.
+//If a network or service issue occurs, an internet error message is displayed.
 
 
 using UnityEngine;
@@ -325,3 +331,4 @@ public class QRScannerController : MonoBehaviour
         _btnResumeScan.gameObject.SetActive(false);
     }
 }
+
