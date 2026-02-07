@@ -1,68 +1,71 @@
+
+
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using ZXing;                 // مكتبة قراءة QR Code
+using ZXing;                 // Library used to read QR Codes
 using Firebase;
-using Firebase.Firestore;    // Firestore Database
-using Firebase.Extensions;   // تشغيل Firebase على Main Thread
-using Firebase.Auth;         // المصادقة (Authentication)
+using Firebase.Firestore;    // Firestore database
+using Firebase.Extensions;   // Allows Firebase callbacks on the main thread
+using Firebase.Auth;         // Firebase authentication
 using System;
 using System.Collections;
-using UnityEngine.Android;   // صلاحيات أندرويد (الكاميرا)
+using UnityEngine.Android;   // Android permissions (Camera)
 using System.Collections.Generic;
 
 public class QRScannerController : MonoBehaviour
 {
     [Header("UI References")]
-    [SerializeField] private RawImage _rawImageBackground; 
-    // لعرض صورة الكاميرا داخل واجهة Unity
+    [SerializeField] private RawImage _rawImageBackground;
+    // Displays the live camera feed on the UI
 
-    [SerializeField] private AspectRatioFitter _aspectRatioFitter; 
-    // لضبط نسبة العرض إلى الارتفاع حسب الكاميرا
+    [SerializeField] private AspectRatioFitter _aspectRatioFitter;
+    // Keeps the camera image aspect ratio correct
 
-    [SerializeField] private TextMeshProUGUI _textOut; 
-    // لعرض الرسائل (جاهز – خطأ – نتيجة QR)
+    [SerializeField] private TextMeshProUGUI _textOut;
+    // Shows status messages and scan results
 
-    [SerializeField] private RectTransform _scanZone; 
-    // منطقة المسح (غير مستخدمة هنا لكنها جاهزة للتطوير)
+    [SerializeField] private RectTransform _scanZone;
+    // Scan area (reserved for future use / visual guide)
 
-    [SerializeField] private Button _btnResumeScan; 
-    // زر إعادة تفعيل المسح اليدوي
+    [SerializeField] private Button _btnResumeScan;
+    // Button to manually resume scanning
 
-    private bool _isCamAvaible = false; 
-    // هل الكاميرا جاهزة للعمل؟
+    private bool _isCamAvaible = false;
+    // Indicates whether the camera is ready
 
-    private bool _canScan = true; 
-    // هل مسموح بالمسح الآن؟
+    private bool _canScan = true;
+    // Controls whether scanning is allowed
 
-    private WebCamTexture _cameraTexture; 
-    // مصدر بث الكاميرا
+    private WebCamTexture _cameraTexture;
+    // Camera texture used to capture frames
 
-    private FirebaseFirestore db; 
-    // مرجع قاعدة بيانات Firestore
+    private FirebaseFirestore db;
+    // Reference to Firestore database
 
-    private Coroutine _scanTimeout; 
-    // Coroutine لإيقاف المسح إذا طال الانتظار (Timeout)
+    private Coroutine _scanTimeout;
+    // Coroutine used to handle scan timeout
 
     void Start()
     {
-        // تهيئة Firebase
+        // Initialize Firebase services
         InitFirebase();
 
-        // ربط زر الاستئناف بالدالة
+        // Assign button click event
         _btnResumeScan.onClick.AddListener(ResumeScanManual);
 
-        // إخفاء الزر بالبداية
+        // Hide resume button at start
         _btnResumeScan.gameObject.SetActive(false);
 
-        // بدء فحص صلاحية الكاميرا
+        // Start checking camera permission
         StartCoroutine(CameraPermissionLoop());
     }
 
     private IEnumerator CameraPermissionLoop()
     {
 #if UNITY_ANDROID
-        // التحقق من صلاحية الكاميرا في أندرويد
+        // Keep requesting camera permission until granted
         while (!Permission.HasUserAuthorizedPermission(Permission.Camera))
         {
             _textOut.text = "Camera permission is required";
@@ -70,16 +73,16 @@ public class QRScannerController : MonoBehaviour
             yield return new WaitForSeconds(1f);
         }
 #endif
-        // بعد الموافقة، تشغيل الكاميرا
+        // Once permission is granted, set up the camera
         yield return StartCoroutine(SetUpCamera());
     }
 
     void OnApplicationFocus(bool hasFocus)
     {
-        // عند الرجوع للتطبيق من الخلفية
+        // Called when the app regains focus
         if (!hasFocus) return;
 
-        // إذا الكاميرا غير جاهزة أعد طلب الصلاحية
+        // Recheck camera if it was not available
         if (!_isCamAvaible)
         {
             StartCoroutine(CameraPermissionLoop());
@@ -88,24 +91,24 @@ public class QRScannerController : MonoBehaviour
 
     private IEnumerator SetUpCamera()
     {
-        // إيقاف الكاميرا القديمة إن وجدت
+        // Stop and destroy previous camera instance if it exists
         if (_cameraTexture != null)
         {
             _cameraTexture.Stop();
             Destroy(_cameraTexture);
         }
 
-        // جلب جميع كاميرات الجهاز
+        // Get all available cameras
         WebCamDevice[] devices = WebCamTexture.devices;
 
-        // في حال عدم وجود كاميرا
+        // No camera found
         if (devices.Length == 0)
         {
             _textOut.text = "No camera found";
             yield break;
         }
 
-        // اختيار الكاميرا الخلفية
+        // Select the back camera
         foreach (var device in devices)
         {
             if (!device.isFrontFacing)
@@ -115,14 +118,14 @@ public class QRScannerController : MonoBehaviour
             }
         }
 
-        // تشغيل الكاميرا
+        // Start the camera
         _cameraTexture.Play();
 
-        // الانتظار حتى تبدأ الكاميرا فعليًا
+        // Wait until camera is fully initialized
         while (_cameraTexture.width <= 16)
             yield return null;
 
-        // عرض بث الكاميرا في الواجهة
+        // Assign camera feed to UI
         _rawImageBackground.texture = _cameraTexture;
         _isCamAvaible = true;
         _textOut.text = "Camera Ready";
@@ -130,25 +133,25 @@ public class QRScannerController : MonoBehaviour
 
     void Update()
     {
-        // التأكد أن الكاميرا تعمل
+        // Exit if camera is not ready
         if (!_isCamAvaible || _cameraTexture == null || !_cameraTexture.isPlaying)
             return;
 
-        // ضبط نسبة العرض
+        // Adjust aspect ratio based on camera resolution
         float ratio = (float)_cameraTexture.width / _cameraTexture.height;
         _aspectRatioFitter.aspectRatio = ratio;
 
-        // تدوير الصورة حسب وضعية الجهاز
+        // Rotate image based on device orientation
         int rotation = _cameraTexture.videoRotationAngle;
         _rawImageBackground.rectTransform.localEulerAngles =
             new Vector3(0, 0, -rotation);
 
-        // تصحيح الانعكاس العمودي
+        // Fix vertical mirroring
         float scaleY = _cameraTexture.videoVerticallyMirrored ? -1f : 1f;
         _rawImageBackground.rectTransform.localScale =
             new Vector3(1f, scaleY, 1f);
 
-        // بدء المسح إذا كان مسموح
+        // Perform scan if allowed
         if (_canScan)
             Scan();
     }
@@ -157,28 +160,28 @@ public class QRScannerController : MonoBehaviour
     {
         try
         {
-            // إنشاء قارئ QR
+            // Create QR code reader
             IBarcodeReader reader = new BarcodeReader();
 
-            // محاولة قراءة QR من صورة الكاميرا
+            // Decode QR code from camera frame
             Result result = reader.Decode(
                 _cameraTexture.GetPixels32(),
                 _cameraTexture.width,
                 _cameraTexture.height
             );
 
-            // إذا لم يتم العثور على QR
+            // No QR detected
             if (result == null) return;
 
-            // إيقاف المسح مؤقتًا
+            // Stop further scanning
             _canScan = false;
 
-            // اهتزاز الجهاز
+            // Vibrate device for feedback
             Handheld.Vibrate();
 
             string qrId = result.Text.Trim();
 
-            // التحقق من أن QR يبدأ بالبادئة الصحيحة
+            // Validate QR prefix
             if (string.IsNullOrEmpty(qrId) || !qrId.StartsWith("qr_entrance_"))
             {
                 _textOut.text = "Invalid QR Code";
@@ -187,19 +190,19 @@ public class QRScannerController : MonoBehaviour
                 return;
             }
 
-            // عرض حالة البحث
+            // Show searching status
             _textOut.text = "Searching...";
 
-            // تشغيل Timeout لمدة 5 ثواني
+            // Start timeout (5 seconds)
             if (_scanTimeout != null) StopCoroutine(_scanTimeout);
             _scanTimeout = StartCoroutine(ScanTimeout());
 
-            // جلب البيانات من Firebase
+            // Fetch data from Firestore
             FetchData(qrId);
         }
         catch (Exception e)
         {
-            // في حال حدوث خطأ غير متوقع
+            // Handle unexpected errors
             Debug.LogWarning("QR Scan Exception: " + e.Message);
             _textOut.text = "Scan Error";
             ShowResumeButton();
@@ -208,10 +211,10 @@ public class QRScannerController : MonoBehaviour
 
     private IEnumerator ScanTimeout()
     {
-        // انتظار 5 ثواني
+        // Wait for 5 seconds
         yield return new WaitForSeconds(5f);
 
-        // إذا ما زال المسح متوقف
+        // If still not resolved, show error
         if (!_canScan)
         {
             _textOut.text = "Service unavailable, try again";
@@ -221,16 +224,16 @@ public class QRScannerController : MonoBehaviour
 
     private void InitFirebase()
     {
-        // التحقق من جاهزية Firebase
+        // Check Firebase dependencies
         FirebaseApp.CheckAndFixDependenciesAsync()
             .ContinueWithOnMainThread(task =>
             {
                 if (task.Result == DependencyStatus.Available)
                 {
-                    // تهيئة Firestore
+                    // Initialize Firestore
                     db = FirebaseFirestore.DefaultInstance;
 
-                    // تسجيل دخول مجهول
+                    // Anonymous sign-in
                     FirebaseAuth.DefaultInstance.SignInAnonymouslyAsync();
                 }
                 else
@@ -242,7 +245,7 @@ public class QRScannerController : MonoBehaviour
 
     private void FetchData(string qrId)
     {
-        // إذا لم يكن Firebase جاهز
+        // Firebase not ready
         if (db == null)
         {
             _textOut.text = "Service not ready, try again";
@@ -250,22 +253,22 @@ public class QRScannerController : MonoBehaviour
             return;
         }
 
-        // جلب مستند QR من Firestore
+        // Request QR document from Firestore
         db.Collection("qr_anchors").Document(qrId)
           .GetSnapshotAsync()
           .ContinueWithOnMainThread(task =>
           {
-              // إيقاف Timeout عند وصول الرد
+              // Stop timeout when response arrives
               if (_scanTimeout != null)
               {
                   StopCoroutine(_scanTimeout);
                   _scanTimeout = null;
               }
 
-              // إظهار زر إعادة المسح
+              // show resume button
               ShowResumeButton();
 
-              // خطأ في الشبكة
+              // Network or request error
               if (task.IsFaulted)
               {
                   _textOut.text = "Network Error!";
@@ -276,17 +279,17 @@ public class QRScannerController : MonoBehaviour
 
               if (snap.Exists)
               {
-                  // تحويل البيانات إلى Dictionary
+                  // Convert Firestore data to dictionary
                   var data = snap.ToDictionary();
 
-                  // قراءة البيانات الأساسية
+                  // Read building and floor info
                   string building = data.ContainsKey("buildingId") ? data["buildingId"].ToString() : "Unknown";
                   int floor = data.ContainsKey("floor") ? Convert.ToInt32(data["floor"]) : 0;
 
                   float x = 0f;
                   float y = 0f;
 
-                  // قراءة إحداثيات الـ Anchor
+                  // Read anchor position
                   if (data.ContainsKey("anchorPos"))
                   {
                       var anchorPos = data["anchorPos"] as IDictionary<string, object>;
@@ -297,7 +300,7 @@ public class QRScannerController : MonoBehaviour
                       }
                   }
 
-                  // عرض النتيجة
+                  // Display result
                   _textOut.text =
                       $"Building: {building}\nFloor: {floor}\nanchorPos.x = {x}, anchorPos.y = {y})";
               }
@@ -310,13 +313,13 @@ public class QRScannerController : MonoBehaviour
 
     private void ShowResumeButton()
     {
-        // إظهار زر إعادة المسح
+        // Enable resume scan button
         _btnResumeScan.gameObject.SetActive(true);
     }
 
     public void ResumeScanManual()
     {
-        // إعادة تفعيل المسح
+        // Allow scanning again
         _canScan = true;
         _textOut.text = "Ready to scan...";
         _btnResumeScan.gameObject.SetActive(false);
