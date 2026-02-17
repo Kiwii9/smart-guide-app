@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "606348378948",
+    "project_id": "smartguideapp-d3876",
+    "storage_bucket": "smartguideapp-d3876.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606348378948:android:96df97add65822b00f0d11",
+        "android_client_info": {
+          "package_name": "com.kfu.smartguide"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtJFYf_pybX2OGLR7Ofz0a0oYxxA65nJc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606348378948:android:6b1d256a9a255a530f0d11",
+        "android_client_info": {
+          "package_name": "com.unity.template.ar_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtJFYf_pybX2OGLR7Ofz0a0oYxxA65nJc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
